@@ -287,8 +287,25 @@ class BusArrivalDisplay:
                 left_rect = left_surf.get_rect(midleft=(left_x, y_pos))
                 self.screen.blit(left_surf, left_rect)
 
+            # Build the center text. For subway/heavy-rail arrivals, include the
+            # final stop (destination) in parentheses after the stop name.
+            stop_display = str(stop)
+            try:
+                # route_type_val set earlier; reuse to detect subway/heavy rail
+                rt = route_type_val
+            except NameError:
+                rt = str(item.get('route_type') or '').lower()
+
+            # If this is not a bus and appears to be a rail/subway route,
+            # append the destination (route_long_name) if it's available and
+            # different from the stop name.
+            if not is_bus and (('rail' in rt) or ('subway' in rt) or ('heavy' in rt)):
+                dest = item.get('route_long_name') or ''
+                if dest and dest != stop_display:
+                    stop_display = f"{stop_display} ({dest})"
+
             # All non-badge text should be white on the LED background
-            center_surf = route_font.render(str(stop), True, HEADER_COLOR)
+            center_surf = route_font.render(stop_display, True, HEADER_COLOR)
             center_rect = center_surf.get_rect(center=(center_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
