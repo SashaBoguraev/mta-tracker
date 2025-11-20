@@ -20,4 +20,19 @@
     { "id": "303845", "name": "NASSAU AV/KINGSLAND AV" },
     { "id": "303837", "name": "NASSAU AV/MONITOR ST" }
   ]
+  ,
+  "subway_provider": {
+    "name": "realtimerail",
+    "base_url": "https://realtimerail.nyc/transiter/v0.6/",
+    "endpoints": {
+      "stop": "systems/us-ny-subway/stops/STOP_ID"
+    },
+    "headers": {
+      "Accept": "application/json"
+    }
+  },
+  "subway_stops": [
+    { "id": "G28", "name": "NASSAU AV" },
+    { "id": "101N", "name": "MONITOR ST" }
+  ]
 }
