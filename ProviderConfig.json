@@ -1,18 +1,23 @@
 {
   "transport_provider": {
-    "name": "MBTA",
-    "base_url": "https://api-v3.mbta.com",
+    "name": "MTA",
+    "base_url": "https://bustime.mta.info/api/siri/stop-monitoring.xml?key=##KEY##&OperatorRef=MTA",
     "endpoints": {
-      "arrivals": "/predictions?filter[stop]={stop_id}&sort=arrival_time"
+      "arrivals": "&MonitoringRef=STOP_ID"
     },
-    "api_key": "b4636f5086c74fd2b16bfb07fc17bf94",
+    "api_key": "97698199-fdfb-43bd-9e87-5a16b855ced9",
     "headers": {
-      "Content-Type": "application/json",
+      "Content-Type": "application/xml",
       "Accept": "application/vnd.api+json"
     }
   },
   "bus_stop": {
-    "id": "101",
-    "name": "Massachusetts Ave @ Sidney St"
+    "id": "303845",
+    "name": "NASSAU AV/KINGSLAND AV"
   }
+  ,
+  "bus_stops": [
+    { "id": "303845", "name": "NASSAU AV/KINGSLAND AV" },
+    { "id": "303837", "name": "NASSAU AV/MONITOR ST" }
+  ]
 }

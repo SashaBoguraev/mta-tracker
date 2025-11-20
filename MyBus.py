@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 import pytz
 from multiprocessing import Queue
+import os
 import pygame
 import time
 
@@ -12,7 +13,8 @@ pygame.init()
 
 # Constants for display
 SCREEN_WIDTH = 720
-SCREEN_HEIGHT = 720
+# Make height half the width so height:width == 1:2
+SCREEN_HEIGHT = SCREEN_WIDTH // 2
 BACKGROUND_COLOR = (0, 0, 0)  # Black
 TEXT_COLOR = (255, 255, 0)  # Yellow
 HEADER_COLOR = (255, 255, 255)  # White
@@ -33,6 +35,18 @@ class BusArrivalDisplay:
         pygame.display.set_caption("Live Bus Arrivals")
         self.clock = pygame.time.Clock()
         self.running = True
+        # Try to load a logo from the `logo` directory (optional)
+        self.logo = None
+        try:
+            logo_path = os.path.join(os.path.dirname(__file__), 'logo', 'MTA-Metropolitan-Transportation-Authority-Logo.png')
+            if os.path.exists(logo_path):
+                img = pygame.image.load(logo_path).convert_alpha()
+                # Scale logo to fit footer height (target ~40px tall)
+                target_h = min(40, SCREEN_HEIGHT // 6)
+                w = int(img.get_width() * (target_h / img.get_height()))
+                self.logo = pygame.transform.smoothscale(img, (w, target_h))
+        except Exception as e:
+            logging.warning(f"Could not load logo image: {e}")
 
     def get_arrival_color(self, minutes_to_arrival):
         """Get color based on arrival time"""
@@ -44,6 +58,35 @@ class BusArrivalDisplay:
             return WARNING_COLOR
         else:
             return ARRIVAL_COLOR
+
+    def get_route_color(self, route_short_name):
+        """Return a color for the route badge using simple MTA-like heuristics.
+
+        Default is white. Currently maps borough prefixes (e.g., 'B' for Brooklyn)
+        to a blue badge similar to the example image. This is intentionally
+        simple and can be replaced with a fuller mapping if you provide one.
+        """
+        if not route_short_name:
+            return HEADER_COLOR
+
+        r = str(route_short_name).upper()
+
+        # Basic heuristic mapping; tweak these RGB tuples to taste
+        if r.startswith('B'):
+            # Brooklyn buses — blue like the attached example
+            return (30, 115, 190)
+        if r.startswith('M'):
+            # Manhattan — use a darker red
+            return (200, 16, 46)
+        if r.startswith('Q'):
+            # Queens — teal
+            return (0, 128, 128)
+        if r.startswith('S'):
+            # Staten Island / Special — orange
+            return (255, 140, 0)
+
+        # Fallback: white
+        return HEADER_COLOR
 
 
     def draw_header(self, stop_name):
@@ -69,82 +112,88 @@ class BusArrivalDisplay:
 
     def draw_column_headers(self):
         """Draw column headers"""
-        y_pos = 125
+        # Intentionally left blank for subway-style stop list
+        return
 
-        route_header = route_font.render("Route", True, HEADER_COLOR)
-        self.screen.blit(route_header, (100, y_pos))
-
-        time_header = route_font.render("Arrival", True, HEADER_COLOR)
-        self.screen.blit(time_header, (300, y_pos))
-
-        countdown_header = route_font.render("Countdown", True, HEADER_COLOR)
-        self.screen.blit(countdown_header, (500, y_pos))
-
-        # Separator line
-        pygame.draw.line(self.screen, TEXT_COLOR, (50, y_pos + 25), (SCREEN_WIDTH - 50, y_pos + 25), 1)
+    def draw_footer(self):
+        """Draw a small last-updated footer at the bottom of the screen"""
+        current_time = datetime.now().strftime('%I:%M:%S %p')
+        footer_text = small_font.render(f"Last Updated: {current_time}", True, HEADER_COLOR)
+        footer_rect = footer_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 24))
+        self.screen.blit(footer_text, footer_rect)
+        # If a logo was loaded, draw it to the bottom-left above the footer
+        if getattr(self, 'logo', None):
+            logo_x = 10
+            logo_y = SCREEN_HEIGHT - self.logo.get_height() - 8
+            self.screen.blit(self.logo, (logo_x, logo_y))
 
     def draw_arrivals(self, arrivals):
-        """Draw the arrival information"""
-        start_y = 160
-        line_height = 40
-        max_visible = 8  # Maximum arrivals to show on screen
+        """Render a simple list where each row shows:
+        left: route short name (e.g., B48)
+        center: stop name
+        right: minutes until arrival
+        """
 
-        visible_arrivals = arrivals[:max_visible]
+        if not arrivals:
+            return
 
-        for i, arrival in enumerate(visible_arrivals):
-            y_pos = start_y + (i * line_height)
+        line_height = 64
+        # Place the first row flush to the top: center the text vertically on the
+        # first row by using half the line height as the starting y coordinate.
+        start_y = line_height // 2
+        max_visible = (SCREEN_HEIGHT - start_y) // line_height
+        visible = arrivals[:max_visible]
 
-            route_name = arrival.get('route_short_name', 'Unknown')
-            route_type = arrival.get('route_type', 'Bus')
-            formatted_time = arrival.get('formatted_time', 'Unknown')
-            minutes_to_arrival = arrival.get('minutes_to_arrival')
+        left_x = 80
+        center_x = SCREEN_WIDTH // 2
+        right_x = SCREEN_WIDTH - 80
 
+        for i, item in enumerate(visible):
+            y_pos = start_y + i * line_height
 
-            # Route information
-            route_text = route_font.render(f"{route_name}", True, TEXT_COLOR)
-            self.screen.blit(route_text, (100, y_pos))
+            # Extract display pieces with sensible fallbacks
+            route = item.get('route_short_name') or item.get('route_long_name') or item.get('route_short') or '—'
+            stop = item.get('stop_name') or item.get('route_long_name') or 'Unknown'
+            minutes = item.get('minutes_to_arrival')
 
-            # Arrival time
-            time_text = time_font.render(formatted_time, True, TEXT_COLOR)
-            self.screen.blit(time_text, (300, y_pos))
-
-            # Countdown with appropriate color
-            if minutes_to_arrival is not None:
-                if minutes_to_arrival == 0:
-                    countdown_text = "🚨 ARRIVING NOW"
-                    color = URGENT_COLOR
-                elif minutes_to_arrival == 1:
-                    countdown_text = "1 minute"
-                    color = WARNING_COLOR
-                elif minutes_to_arrival <= 5:
-                    countdown_text = f"⚡ {minutes_to_arrival} minutes"
-                    color = WARNING_COLOR
-                else:
-                    countdown_text = f"{minutes_to_arrival} minutes"
-                    color = ARRIVAL_COLOR
+            # Format minutes text
+            if minutes is None:
+                minutes_text = '—'
+            elif minutes == 0:
+                minutes_text = 'Now'
             else:
-                countdown_text = "Unknown"
-                color = TEXT_COLOR
+                minutes_text = f"{minutes} min"
 
-            countdown_surface = time_font.render(countdown_text, True, color)
-            self.screen.blit(countdown_surface, (500, y_pos))
+            # Colors
+            minutes_color = self.get_arrival_color(minutes)
 
-            # Draw separator line between routes
-            if i < len(visible_arrivals) - 1:
-                pygame.draw.line(self.screen, (64, 64, 64),
-                                 (50, y_pos + line_height - 5),
-                                 (SCREEN_WIDTH - 50, y_pos + line_height - 5), 1)
+            # Render left (route), center (stop), right (minutes)
+            route_color = self.get_route_color(route)
+            left_surf = route_font.render(str(route), True, route_color)
+            left_rect = left_surf.get_rect(midleft=(left_x, y_pos))
+            self.screen.blit(left_surf, left_rect)
+
+            # All non-badge text should be white on the LED background
+            center_surf = route_font.render(str(stop), True, HEADER_COLOR)
+            center_rect = center_surf.get_rect(center=(center_x, y_pos))
+            self.screen.blit(center_surf, center_rect)
+
+            # Minutes text in white (user requested white text except for the line badge)
+            right_surf = time_font.render(str(minutes_text), True, HEADER_COLOR)
+            right_rect = right_surf.get_rect(midright=(right_x, y_pos))
+            self.screen.blit(right_surf, right_rect)
+
+            # Separator between rows
+            if i < len(visible) - 1:
+                sep_y = y_pos + line_height // 2 - 6
+                pygame.draw.line(self.screen, (64, 64, 64), (50, sep_y), (SCREEN_WIDTH - 50, sep_y), 1)
 
     def draw_no_arrivals(self):
         """Draw message when no arrivals available"""
         no_data_text = route_font.render("🔭 No arrival information available", True, WARNING_COLOR)
         no_data_rect = no_data_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
         self.screen.blit(no_data_text, no_data_rect)
-
-        current_time = datetime.now().strftime('%I:%M:%S %p')
-        time_text = time_font.render(f"📅 Last Updated: {current_time}", True, TEXT_COLOR)
-        time_rect = time_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40))
-        self.screen.blit(time_text, time_rect)
+        # Footer will display last-updated time; keep the main message centered
 
     def display_arrivals(self, arrivals):
         """Main display function - replaces the console print version"""
@@ -162,16 +211,12 @@ class BusArrivalDisplay:
         self.screen.fill(BACKGROUND_COLOR)
 
         if arrivals:
-            # Get stop name from first arrival
-            stop_name = arrivals[0].get('stop_name', 'Unknown Stop')
-
-            # Draw all components
-            self.draw_header(stop_name)
-            self.draw_column_headers()
+            # Draw arrivals list and footer (header removed per user request)
             self.draw_arrivals(arrivals)
+            self.draw_footer()
         else:
-            self.draw_header("Unknown Stop")
             self.draw_no_arrivals()
+            self.draw_footer()
 
         # Update display
         pygame.display.flip()
@@ -314,74 +359,117 @@ def get_bus_arrivals():
     endpoint_template = safe_get_nested_value(provider_config, 'endpoints', 'arrivals')
     api_key = provider_config.get('api_key')
     headers = provider_config.get('headers', {})
-    stop_id = bus_stop.get('id')
-    stop_name = bus_stop.get('name', 'Unknown Stop')
+    # Support multiple stops: prefer 'bus_stops' (list), fall back to single 'bus_stop'
+    stops_config = config.get('bus_stops') or [bus_stop]
     timeout = request_settings.get('timeout', 30)
     max_arrivals = request_settings.get('max_arrivals', 10)
 
     # Validate required parameters
-    if not all([base_url, endpoint_template, stop_id]):
+    if not all([base_url, endpoint_template]):
         logging.error("Missing required configuration parameters")
         return []
 
-    # Build URL with include parameter to get route information
-    endpoint = endpoint_template.format(stop_id=stop_id)
-    url = f"{base_url}{endpoint}&include=route&page[limit]={max_arrivals}"
+    # The config places the '##KEY##' placeholder in base_url. Replace it there
+    if api_key and base_url:
+        base_url = base_url.replace("##KEY##", api_key)
 
-    # Add API key to headers if available
-    if api_key:
-        headers = headers.copy()  # Don't modify original headers
-        headers['X-API-Key'] = api_key
+    # Prefer the JSON endpoint so make_api_request can parse JSON responses
+    if base_url and ".xml" in base_url:
+        base_url = base_url.replace('.xml', '.json', 1)
 
-    # Make API request
-    data = make_api_request(url, headers, timeout)
-    if data is None:
-        logging.error("Failed to fetch arrival data")
-        return []
+    # Helper to parse a single response payload for a given stop name
+    def parse_arrivals_from_response(data, stop_name_local, limit):
+        parsed = []
+        if not data:
+            return parsed
 
-    # Process arrivals safely
-    arrivals = []
-    predictions = data.get('data', [])
-    included_data = data.get('included', [])
+        # SIRI response
+        if isinstance(data, dict) and 'Siri' in data:
+            deliveries = data.get('Siri', {}).get('ServiceDelivery', {}).get('StopMonitoringDelivery', [])
+            for delivery in deliveries:
+                visits = delivery.get('MonitoredStopVisit', [])
+                for visit in visits:
+                    mvj = visit.get('MonitoredVehicleJourney', {})
+                    route_short = mvj.get('PublishedLineName') or mvj.get('LineRef') or 'Unknown'
+                    route_long = route_short
+                    direction = mvj.get('DirectionRef')
+                    monitored_call = mvj.get('MonitoredCall', {})
+                    arrival_time = monitored_call.get('ExpectedArrivalTime') or monitored_call.get('AimedArrivalTime') or monitored_call.get('ExpectedDepartureTime')
 
-    for prediction in predictions:
-        attributes = prediction.get('attributes', {})
-        relationships = prediction.get('relationships', {})
+                    if not arrival_time:
+                        arrival_time = mvj.get('ExpectedArrivalTime') or mvj.get('AimedArrivalTime')
 
-        arrival_time = attributes.get('arrival_time')
-        departure_time = attributes.get('departure_time')
+                    if arrival_time:
+                        minutes_to_arrival = calculate_time_to_arrival(arrival_time)
+                        formatted_time = format_arrival_time(arrival_time)
+                        parsed.append({
+                            'route_short_name': route_short,
+                            'route_long_name': route_long,
+                            'route_type': get_route_type_name(3),
+                            'arrival_time': arrival_time,
+                            'formatted_time': formatted_time,
+                            'minutes_to_arrival': minutes_to_arrival,
+                            'direction_id': direction,
+                            'status': mvj.get('ProgressStatus') or mvj.get('Monitored'),
+                            'stop_name': stop_name_local
+                        })
 
-        # Use arrival_time if available, otherwise departure_time
-        predicted_time = arrival_time or departure_time
+        else:
+            # Fallback: assume JSON:API style
+            predictions = data.get('data', [])
+            included_data = data.get('included', [])
+            for prediction in predictions:
+                attributes = prediction.get('attributes', {})
+                relationships = prediction.get('relationships', {})
+                arrival_time = attributes.get('arrival_time')
+                departure_time = attributes.get('departure_time')
+                predicted_time = arrival_time or departure_time
+                if predicted_time:
+                    route_relationship = relationships.get('route', {})
+                    route_data = route_relationship.get('data', {})
+                    route_id = route_data.get('id') if route_data else None
+                    route_info = extract_route_info(included_data, route_id)
+                    minutes_to_arrival = calculate_time_to_arrival(predicted_time)
+                    formatted_time = format_arrival_time(predicted_time)
+                    parsed.append({
+                        'route_short_name': route_info['short_name'],
+                        'route_long_name': route_info['long_name'],
+                        'route_type': get_route_type_name(route_info.get('route_type', 3)),
+                        'arrival_time': predicted_time,
+                        'formatted_time': formatted_time,
+                        'minutes_to_arrival': minutes_to_arrival,
+                        'direction_id': attributes.get('direction_id'),
+                        'status': attributes.get('status'),
+                        'stop_name': stop_name_local
+                    })
 
-        if predicted_time:
-            # Get route information
-            route_relationship = relationships.get('route', {})
-            route_data = route_relationship.get('data', {})
-            route_id = route_data.get('id') if route_data else None
+        parsed.sort(key=lambda x: x['arrival_time'] if x['arrival_time'] else '')
+        return parsed[:limit]
 
-            route_info = extract_route_info(included_data, route_id)
+    # Iterate over configured stops and aggregate arrivals
+    all_arrivals = []
+    for s in stops_config:
+        stop_id = s.get('id')
+        stop_name = s.get('name', f"Stop {stop_id}")
+        if not stop_id:
+            continue
 
-            # Calculate time to arrival
-            minutes_to_arrival = calculate_time_to_arrival(predicted_time)
-            formatted_time = format_arrival_time(predicted_time)
+        endpoint = endpoint_template.replace("STOP_ID", stop_id)
+        url = f"{base_url}{endpoint}&MaximumStopVisits={max_arrivals}"
 
-            arrivals.append({
-                'route_short_name': route_info['short_name'],
-                'route_long_name': route_info['long_name'],
-                'route_type': get_route_type_name(route_info.get('route_type', 3)),
-                'arrival_time': predicted_time,
-                'formatted_time': formatted_time,
-                'minutes_to_arrival': minutes_to_arrival,
-                'direction_id': attributes.get('direction_id'),
-                'status': attributes.get('status'),
-                'stop_name': stop_name
-            })
+        # Copy headers and attach api key header if present
+        req_headers = headers.copy() if headers else {}
+        if api_key:
+            req_headers['X-API-Key'] = api_key
 
-    # Sort by arrival time
-    arrivals.sort(key=lambda x: x['arrival_time'] if x['arrival_time'] else '')
+        # Fetch and parse
+        data = make_api_request(url, req_headers, timeout)
+        parsed_for_stop = parse_arrivals_from_response(data, stop_name, max_arrivals)
+        all_arrivals.extend(parsed_for_stop)
 
-    return arrivals
+    # Final sort across all stops and limit total results
+    all_arrivals.sort(key=lambda x: x['arrival_time'] if x['arrival_time'] else '')
+    return all_arrivals[:max_arrivals]
 
 
 def display_arrivals(arrivals):
