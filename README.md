@@ -1,5 +1,8 @@
 # MyBus
 
+## TO-DO
+- [ ] Get the direction for the subway
+
 A simple Python application for the Raspberry Pi that provides real-time transit arrival information for bus stops, trains, and other public transportation. The application continuously monitors and displays live arrival times with an intuitive console interface.
 
 ## Features

@@ -32,7 +32,6 @@
     }
   },
   "subway_stops": [
-    { "id": "G28", "name": "NASSAU AV" },
-    { "id": "101N", "name": "MONITOR ST" }
+    { "id": "G28", "name": "NASSAU AV" }
   ]
 }
