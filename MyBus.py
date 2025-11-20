@@ -753,9 +753,11 @@ def run_monitoring():
 
             # Choose arrivals according to current mode
             if current_mode == 'combined':
+                # In combined mode, show at most 4 items from each provider
+                per_type_max = 4
                 arrivals = []
-                arrivals.extend(bus_list)
-                arrivals.extend(subway_list)
+                arrivals.extend(bus_list[:per_type_max])
+                arrivals.extend(subway_list[:per_type_max])
             elif current_mode == 'subway':
                 arrivals = list(subway_list)
             else:  # 'bus'
