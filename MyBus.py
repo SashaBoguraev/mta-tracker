@@ -55,6 +55,7 @@ time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
 STOP_TEXT_LEFT_OFFSET = 0
 MATRIX_CENTER_MARGIN = 2
+MATRIX_SPACE_WIDTH = 3
 CUSTOM_SPACE_SCALE = 0.55
 
 
@@ -85,16 +86,13 @@ def _normalize_stop_label(label):
     return cleaned.strip().upper()
 
 
-def render_text_with_custom_space(font, text, color, space_scale=CUSTOM_SPACE_SCALE, space_width=None):
-    """Render text while adjusting inter-word spacing to either a scale or fixed width."""
+def render_text_with_custom_space(font, text, color, space_scale=CUSTOM_SPACE_SCALE):
+    """Render text while shrinking inter-word spacing to the given scale."""
     if text is None:
         text = ''
     text = str(text)
-    if space_width is None:
-        base_space = max(1, font.size(' ')[0])
-        scaled_space = max(1, int(math.ceil(base_space * space_scale)))
-    else:
-        scaled_space = max(1, int(math.ceil(space_width)))
+    base_space = max(1, font.size(' ')[0])
+    scaled_space = max(1, int(math.ceil(base_space * space_scale)))
     glyphs = []
     x_cursor = 0
     for char in text:
@@ -291,7 +289,7 @@ class BusArrivalDisplay:
         self.screen.blit(title_text, title_rect)
 
         # Stop name
-        stop_text = render_text_with_custom_space(route_font, stop_name, TEXT_COLOR, space_width=3)
+        stop_text = route_font.render(f"{stop_name}", True, TEXT_COLOR)
         stop_rect = stop_text.get_rect(center=(SCREEN_WIDTH // 2, 65))
         self.screen.blit(stop_text, stop_rect)
 
@@ -544,12 +542,34 @@ if _HAS_RGBMATRIX:
             if callable(char_width_func):
                 total = 0
                 for ch in text:
-                    try:
-                        total += char_width_func(ord(ch))
-                    except Exception:
-                        total += max(1, getattr(self.font, 'height', 8) // 2)
+                    if ch == ' ':
+                        total += MATRIX_SPACE_WIDTH
+                    else:
+                        try:
+                            total += char_width_func(ord(ch))
+                        except Exception:
+                            total += max(1, getattr(self.font, 'height', 8) // 2)
                 return total
             return len(text) * max(1, getattr(self.font, 'height', 8) // 2)
+
+        def _draw_text_custom(self, x, y, color, text):
+            """Draw text with custom space width between words."""
+            if not text:
+                return
+            char_width_func = getattr(self.font, 'CharacterWidth', None)
+            cursor_x = x
+            for ch in text:
+                if ch == ' ':
+                    cursor_x += MATRIX_SPACE_WIDTH
+                else:
+                    graphics.DrawText(self.canvas, self.font, cursor_x, y, color, ch)
+                    if callable(char_width_func):
+                        try:
+                            cursor_x += char_width_func(ord(ch))
+                        except Exception:
+                            cursor_x += max(1, getattr(self.font, 'height', 8) // 2)
+                    else:
+                        cursor_x += max(1, getattr(self.font, 'height', 8) // 2)
 
         def _get_route_color(self, route_name):
             if not route_name:
@@ -617,7 +637,7 @@ if _HAS_RGBMATRIX:
             max_allowed = max(1, self.cols - center_width - 1)
             center_x = min(center_left, max_allowed)
             center_color = row.get('route_color') or self.header_color
-            graphics.DrawText(self.canvas, self.font, center_x, y, center_color, center_text)
+            self._draw_text_custom(center_x, y, center_color, center_text)
 
             minutes_text = row['minutes_text']
             minutes_width = self._text_width(minutes_text)
