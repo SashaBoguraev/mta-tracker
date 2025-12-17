@@ -79,7 +79,7 @@ def _normalize_stop_label(label):
                      lambda m: m.group(0).title(),
                      cleaned,
                      flags=re.IGNORECASE)
-    return cleaned.strip()
+    return cleaned.strip().upper()
 
 
 def _is_subway_or_rail_route(route_type):
