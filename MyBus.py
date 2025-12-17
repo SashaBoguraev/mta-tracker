@@ -51,6 +51,49 @@ time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
 
 
+def _extract_after_nassau_av(stop_name):
+    """Return the substring after 'Nassau Av/' (case-insensitive)."""
+    if not stop_name:
+        return None
+    marker = 'nassau av/'
+    lower_name = stop_name.lower()
+    idx = lower_name.find(marker)
+    if idx == -1:
+        return None
+    tail = stop_name[idx + len(marker):].strip()
+    return tail or None
+
+
+def _is_subway_or_rail_route(route_type):
+    """Detect whether a route type string refers to heavy rail/subway."""
+    if not route_type:
+        return False
+    lowered = str(route_type).lower()
+    return any(token in lowered for token in ('subway', 'rail', 'heavy'))
+
+
+def get_arrival_center_label(arrival):
+    """Determine the friendly center label for an arrival row."""
+    if not isinstance(arrival, dict):
+        return 'Transit'
+
+    if _is_subway_or_rail_route(arrival.get('route_type')):
+        destination = arrival.get('destination') or arrival.get('route_long_name')
+        if destination:
+            return destination
+
+    cross_street = _extract_after_nassau_av(arrival.get('stop_name'))
+    if cross_street:
+        return cross_street
+
+    return (
+        arrival.get('stop_name')
+        or arrival.get('route_long_name')
+        or arrival.get('route_short_name')
+        or 'Transit'
+    )
+
+
 class BusArrivalDisplay:
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -301,25 +344,10 @@ class BusArrivalDisplay:
                 left_rect = left_surf.get_rect(midleft=(left_x, y_pos))
                 self.screen.blit(left_surf, left_rect)
 
-            # Build the center text. For subway/heavy-rail arrivals, include the
-            # final stop (destination) in parentheses after the stop name.
-            stop_display = str(stop)
-            try:
-                # route_type_val set earlier; reuse to detect subway/heavy rail
-                rt = route_type_val
-            except NameError:
-                rt = str(item.get('route_type') or '').lower()
-
-            # If this is not a bus and appears to be a rail/subway route,
-            # append the destination (route_long_name) if it's available and
-            # different from the stop name.
-            if not is_bus and (('rail' in rt) or ('subway' in rt) or ('heavy' in rt)):
-                dest = item.get('route_long_name') or ''
-                if dest and dest != stop_display:
-                    stop_display = f"{stop_display} ({dest})"
+            center_text_value = get_arrival_center_label(item)
 
             # All non-badge text should be white on the LED background
-            center_surf = route_font.render(stop_display, True, HEADER_COLOR)
+            center_surf = route_font.render(str(center_text_value), True, HEADER_COLOR)
             center_rect = center_surf.get_rect(center=(center_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
@@ -477,13 +505,8 @@ if _HAS_RGBMATRIX:
             return self.text_color
 
         def _format_center_text(self, arrival):
-            stop_name = arrival.get('stop_name') or 'Transit'
-            destination = arrival.get('destination') or arrival.get('route_long_name')
-            if destination and destination != stop_name:
-                stop_display = f"{stop_name} ({destination})"
-            else:
-                stop_display = stop_name
-            return self._truncate_text(stop_display)
+            center_label = get_arrival_center_label(arrival)
+            return self._truncate_text(center_label)
 
         def _format_minutes_text(self, minutes):
             if minutes is None:
