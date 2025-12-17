@@ -529,13 +529,6 @@ if _HAS_RGBMATRIX:
             minutes_x = min(minutes_x, max(1, self.cols - minutes_width - 1))
             graphics.DrawText(self.canvas, self.font, minutes_x, y, row['minutes_color'], minutes_text)
 
-        def _draw_view_indicator(self):
-            view_text = self._truncate_text(f"View {self.view_mode.capitalize()}")
-            view_width = self._text_width(view_text)
-            view_x = max(1, (self.cols - view_width) // 2)
-            view_y = max(self.line_height, self.rows - 1)
-            graphics.DrawText(self.canvas, self.font, view_x, view_y, self.header_color, view_text)
-
         def display_arrivals(self, arrivals):
             self.canvas.Clear()
             rows = self._build_rows(arrivals)
@@ -548,7 +541,6 @@ if _HAS_RGBMATRIX:
                     graphics.DrawText(self.canvas, self.font, msg_x, y, self.warning_color, msg_text)
                 else:
                     self._draw_arrival_row(row, y)
-            self._draw_view_indicator()
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
             return True
 
