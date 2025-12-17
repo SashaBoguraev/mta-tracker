@@ -305,7 +305,7 @@ class BusArrivalDisplay:
         visible = arrivals[:max_visible]
 
         left_x = 80
-        center_x = SCREEN_WIDTH // 2 - 40
+        center_x = SCREEN_WIDTH // 2 - 200
         right_x = SCREEN_WIDTH - 80
 
         for i, item in enumerate(visible):
