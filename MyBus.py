@@ -49,6 +49,8 @@ header_font = pygame.font.Font(None, 46)
 route_font = pygame.font.Font(None, 38)
 time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
+STOP_TEXT_LEFT_OFFSET = 0
+MATRIX_CENTER_MARGIN = 8
 
 
 def _extract_after_nassau_av(stop_name):
@@ -347,7 +349,7 @@ class BusArrivalDisplay:
 
             # All non-badge text should be white on the LED background; anchor stop text near the left column
             center_surf = route_font.render(str(center_text_value), True, HEADER_COLOR)
-            center_start_x = left_x + 500
+            center_start_x = left_x + STOP_TEXT_LEFT_OFFSET
             center_rect = center_surf.get_rect(midleft=(center_start_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
@@ -547,7 +549,7 @@ if _HAS_RGBMATRIX:
 
             center_text = row['center_text']
             center_width = self._text_width(center_text)
-            center_margin = 8
+            center_margin = MATRIX_CENTER_MARGIN
             center_left = route_x + route_width + center_margin
             max_allowed = max(1, self.cols - center_width - 1)
             center_x = min(center_left, max_allowed)
