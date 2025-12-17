@@ -418,10 +418,8 @@ if _HAS_RGBMATRIX:
             self.row_spacing = max(0, matrix_config.get('row_spacing', 0))
             self.top_padding = max(0, matrix_config.get('top_padding', 0))
 
-            # Ensure each block can hold the font; row_block_height includes any extra padding
-            self.row_block_height = max(self.line_height, self.font.height)
-            self.row_padding = self.row_block_height - self.font.height
-            self.row_stride = max(1, self.row_block_height + self.row_spacing)
+            self.row_height = max(self.line_height, self.font.height)
+            self.row_stride = max(1, self.row_height + self.row_spacing)
 
             available_rows = max(0, self.rows - self.top_padding)
             computed_lines = max(1, available_rows // self.row_stride)
@@ -541,10 +539,9 @@ if _HAS_RGBMATRIX:
         def display_arrivals(self, arrivals):
             self.canvas.Clear()
             rows = self._build_rows(arrivals)
-            row_padding_offset = self.row_padding // 2
             for idx, row in enumerate(rows):
                 row_top = self.top_padding + idx * self.row_stride
-                y = row_top + self.font.height + row_padding_offset
+                y = row_top + self.row_height
                 if row['type'] == 'message':
                     msg_text = row['text']
                     msg_width = self._text_width(msg_text)
