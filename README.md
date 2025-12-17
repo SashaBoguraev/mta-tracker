@@ -101,6 +101,11 @@ That script installs system packages, builds the `hzeller/rpi-rgb-led-matrix` bi
 copies the `7x13.bdf` font into `fonts/`, and bootstraps `mybus-env` with all Python
 requirements.
 
+After the script finishes, `fonts/7x13.bdf` is available inside the project and becomes
+the default font the matrix backend uses (you can override it via `MATRIX_FONT_PATH`).
+The script also re-uses the same virtual environment as the main monitor, so you can
+immediately activate `mybus-env` and start the monitor with the GPU or matrix backend.
+
 Once the helper finishes, activate the environment and start the monitor with the LED matrix backend:
 
 ```bash
@@ -109,6 +114,11 @@ MYBUS_DISPLAY_BACKEND=matrix python MyBus.py
 ```
 
 If you prefer the pygame window instead of the matrix, omit the `MYBUS_DISPLAY_BACKEND` environment variable or use `MYBUS_DISPLAY_BACKEND=pygame`.
+
+💡 Running the matrix display benefits from real-time priority, so either run the monitor
+as root (e.g., `sudo MYBUS_DISPLAY_BACKEND=matrix python MyBus.py`) or give Python the
+`cap_sys_nice` capability with `sudo setcap 'cap_sys_nice=eip' $(which python3)` before
+starting the display to prevent flicker and color degradation.
 
 
 The application will:
@@ -138,8 +148,12 @@ bindings instead of pygame.
 
 ### 1. Install the matrix library on the Pi
 
-1. Clone and build the project (run these as `pi` or another user with
-  hardware access):
+1. The easiest path is to run `./scripts/setup_pi.sh`, which handles the full
+   build pipeline (apt packages, compiling `hzeller/rpi-rgb-led-matrix`,
+   installing the Python bindings, and copying `7x13.bdf` into `fonts/`).
+
+   If you prefer to do it manually, you can still run the commands below as an
+   alternative:
 
   ```bash
   git clone https://github.com/hzeller/rpi-rgb-led-matrix ~/rpi-rgb-led-matrix
@@ -148,15 +162,13 @@ bindings instead of pygame.
   sudo make install-python PYTHON=$(which python3)
   ```
 
-2. Copy the bundled font files into this repository (or update
-  `MATRIX_FONT_PATH` to point to them):
-
-  ```bash
-  cp ~/rpi-rgb-led-matrix/fonts/7x13.bdf fonts/
-  ```
+2. The helper script already copies the bundled font files into this
+   repository, so the matrix backend can use `fonts/7x13.bdf` by default. If you
+   relocate the font, update the `font_path` in `ProviderConfig.json` or export
+   `MATRIX_FONT_PATH=/path/to/7x13.bdf` before launching `MyBus`.
 
 3. (Optional) Install any extra dependencies mentioned in the matrix README
-  such as `libfreetype6-dev` or `libopenjp2-7` before building.
+   such as `libfreetype6-dev` or `libopenjp2-7` before building.
 
 ### 2. Configure `MyBus` for the matrix
 
@@ -175,7 +187,7 @@ You can drive the matrix by either setting the environment variable
    "hardware_mapping": "adafruit-hat",
    "gpio_slowdown": 2,
    "brightness": 60,
-   "font_path": "/home/pi/rpi-rgb-led-matrix/fonts/7x13.bdf",
+  "font_path": "fonts/7x13.bdf",
    "text_color": [255, 255, 0],
    "header_color": [0, 255, 0],
    "max_arrivals": 2
@@ -282,6 +294,10 @@ The application includes comprehensive error handling for:
 - Validate your JSON syntax
 - Ensure all required fields are present
 - Check API endpoint URLs
+
+**Matrix display warnings**:
+- If you see `Matrix font not found` when starting with `MYBUS_DISPLAY_BACKEND=matrix`, rerun `./scripts/setup_pi.sh` or make sure `fonts/7x13.bdf` is present and `MATRIX_FONT_PATH` points to it.
+- For stable color output, start the monitor as root or run `sudo setcap 'cap_sys_nice=eip' $(which python3)` so the matrix driver can set realtime priority.
 
 ## Contributing
 
