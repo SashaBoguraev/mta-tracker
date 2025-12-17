@@ -404,11 +404,30 @@ if _HAS_RGBMATRIX:
                 )
             self.font.LoadFont(font_path)
 
-            self.line_height = self.font.height + 2
-            self.max_lines = matrix_config.get('max_lines', max(1, self.rows // self.line_height))
+            self.compact_mode = matrix_config.get('compact_mode', self.rows <= 32 and self.cols <= 64)
+            # Allow a shorter line height on smaller matrices (default 10px tall when compact).
+            if 'line_height' in matrix_config:
+                self.line_height = max(1, matrix_config['line_height'])
+            else:
+                default_line_height = self.font.height + 2
+                if self.compact_mode:
+                    default_line_height = max(10, self.font.height - 2)
+                self.line_height = default_line_height
+
+            computed_lines = max(1, self.rows // self.line_height)
+            requested_lines = matrix_config.get('max_lines', computed_lines)
+            self.max_lines = min(max(1, requested_lines), computed_lines)
+            if self.compact_mode:
+                compact_limit = matrix_config.get('compact_max_lines', 4)
+                self.max_lines = min(self.max_lines, compact_limit)
             self.max_lines = max(1, self.max_lines)
+
             self.max_chars = matrix_config.get('max_chars', max(4, self.cols // 6))
-            self.max_arrivals = matrix_config.get('max_arrivals', max(1, self.max_lines - 1))
+            arrivals_capacity = max(1, self.max_lines - 1)
+            requested_arrivals = matrix_config.get('max_arrivals')
+            if requested_arrivals is None:
+                requested_arrivals = arrivals_capacity
+            self.max_arrivals = max(1, min(arrivals_capacity, requested_arrivals))
 
             self.text_color = graphics.Color(*matrix_config.get('text_color', (255, 255, 0)))
             self.header_color = graphics.Color(*matrix_config.get('header_color', (0, 255, 0)))

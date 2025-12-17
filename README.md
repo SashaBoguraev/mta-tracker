@@ -206,6 +206,32 @@ starting the script:
 export MATRIX_FONT_PATH=/path/to/7x13.bdf
 ```
 
+#### Compact layout for 32x64 matrices
+
+Because 32x64 matrices offer very limited pixels, the matrix backend can now
+switch into a *compact mode* that shortens line spacing, limits the number of
+arrivals, and truncates text to fit. It's enabled automatically when Rows ≤ 32
+and Columns ≤ 64, but you can override the defaults in `ProviderConfig.json`:
+
+```json
+"display": {
+  "backend": "matrix",
+  "matrix": {
+    "compact_mode": true,
+    "line_height": 10,
+    "compact_max_lines": 3,
+    "max_arrivals": 2,
+    "font_path": "fonts/7x13.bdf",
+    "text_color": [255, 255, 0],
+    "header_color": [0, 255, 0]
+  }
+}
+```
+
+This keeps the header, two arrival lines, and a small footer label visible without
+overrunning the 32-row buffer. Tweak `line_height` or `compact_max_lines` if
+you pair the Pi with an even smaller custom panel.
+
 ### 3. Run the monitor on the matrix
 
 Make sure the Pi is configured to drive the display (GPIO pins wired,
