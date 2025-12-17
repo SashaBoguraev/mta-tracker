@@ -668,10 +668,11 @@ bus_display = None
 
 
 def normalize_stop_name(stop_name):
-    """Return a lower-case stop name if one was provided."""
+    """Return a title-cased stop name with each word capitalized."""
     if not stop_name:
         return stop_name
-    return str(stop_name).strip()[:1].upper() + str(stop_name).strip()[1:].lower()
+    # Title case: capitalize first letter of each word
+    return str(stop_name).strip().title()
 
 
 def input_thread(a_list):
