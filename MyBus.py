@@ -50,7 +50,7 @@ route_font = pygame.font.Font(None, 38)
 time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
 STOP_TEXT_LEFT_OFFSET = 0
-MATRIX_CENTER_MARGIN = 8
+MATRIX_CENTER_MARGIN = 0
 
 
 def _extract_after_nassau_av(stop_name):
