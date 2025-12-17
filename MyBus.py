@@ -55,7 +55,7 @@ time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
 STOP_TEXT_LEFT_OFFSET = 0
 MATRIX_CENTER_MARGIN = 2
-MATRIX_SPACE_WIDTH = 3
+MATRIX_SPACE_WIDTH = 1
 CUSTOM_SPACE_SCALE = 0.55
 
 
@@ -373,36 +373,15 @@ class BusArrivalDisplay:
             # Colors
             minutes_color = self.get_arrival_color(minutes)
 
-            # Render left: use a route logo only for non-bus routes (subway/trains).
-            # Buses should remain as a badge with inverted (negative) text.
-            route_type_val = str(item.get('route_type') or '').lower()
-            is_bus = 'bus' in route_type_val
-            logo_surf = None
+            # Get route color for stop text
             route_color = self.get_route_color(route)
-            if not is_bus:
-                logo_surf = self.load_route_logo(route, target_h=48)
-            center_start_x = left_x + STOP_TEXT_LEFT_OFFSET
-            if logo_surf:
-                # Align logo vertically centered on the row
-                logo_rect = logo_surf.get_rect(midleft=(left_x - 24, y_pos))
-                self.screen.blit(logo_surf, logo_rect)
-            else:
-                badge_text = str(route).upper()
-                badge_surf = badge_font.render(badge_text, True, (0, 0, 0))
-                badge_width = badge_surf.get_width() + 28
-                badge_height = badge_surf.get_height() + 18
-                badge_rect = pygame.Rect(0, 0, badge_width, badge_height)
-                badge_rect.center = (left_x, y_pos)
-                pygame.draw.ellipse(self.screen, route_color, badge_rect)
-                self.screen.blit(badge_surf, badge_surf.get_rect(center=badge_rect.center))
-                center_start_x = badge_rect.right + 12
 
             center_text_value = _normalize_stop_label(get_arrival_center_label(item))
 
-            # All non-badge text should be white on the LED background; anchor stop text near the left column
+            # Display stop text starting from the left
             center_color = route_color or STOP_TEXT_COLOR
             center_surf = render_text_with_custom_space(route_font, center_text_value, center_color)
-            center_rect = center_surf.get_rect(midleft=(center_start_x, y_pos))
+            center_rect = center_surf.get_rect(midleft=(left_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
             # Minutes text in white (user requested white text except for the line badge)
@@ -610,12 +589,10 @@ if _HAS_RGBMATRIX:
 
             for arrival in arrivals[: self.max_arrivals]:
                 route_name = arrival.get('route_short_name') or arrival.get('route_long_name') or 'Route'
-                route_label = self._truncate_text(route_name, max_chars=4)
                 center_text = self._format_center_text(arrival)
                 minutes_text, minutes_color = self._format_minutes_text(arrival.get('minutes_to_arrival'))
                 rows.append({
                     'type': 'arrival',
-                    'route_label': route_label,
                     'route_color': self._get_route_color(route_name),
                     'center_text': center_text,
                     'minutes_text': minutes_text,
@@ -625,23 +602,17 @@ if _HAS_RGBMATRIX:
             return rows[: self.max_lines]
 
         def _draw_arrival_row(self, row, y):
-            route_x = 1
-            route_text = row['route_label']
-            graphics.DrawText(self.canvas, self.font, route_x, y, row['route_color'], route_text)
-            route_width = self._text_width(route_text)
-
+            # Draw stop text starting from left
             center_text = row['center_text']
-            center_width = self._text_width(center_text)
-            center_margin = MATRIX_CENTER_MARGIN
-            center_left = route_x + route_width + center_margin
-            max_allowed = max(1, self.cols - center_width - 1)
-            center_x = min(center_left, max_allowed)
+            center_x = 1
             center_color = row.get('route_color') or self.header_color
             self._draw_text_custom(center_x, y, center_color, center_text)
 
+            # Draw minutes text on the right
             minutes_text = row['minutes_text']
             minutes_width = self._text_width(minutes_text)
             minutes_x = self.cols - minutes_width - 1
+            center_width = self._text_width(center_text)
             min_overlap = center_x + center_width + 6
             if minutes_x < min_overlap:
                 minutes_x = min_overlap
