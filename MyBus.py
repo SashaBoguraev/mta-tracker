@@ -50,7 +50,7 @@ route_font = pygame.font.Font(None, 38)
 time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
 STOP_TEXT_LEFT_OFFSET = 0
-MATRIX_CENTER_MARGIN = 0
+MATRIX_CENTER_MARGIN = 2
 
 
 def _extract_after_nassau_av(stop_name):
@@ -329,27 +329,33 @@ class BusArrivalDisplay:
             minutes_color = self.get_arrival_color(minutes)
 
             # Render left: use a route logo only for non-bus routes (subway/trains).
-            # Buses should remain as text per user request.
+            # Buses should remain as a badge with inverted (negative) text.
             route_type_val = str(item.get('route_type') or '').lower()
             is_bus = 'bus' in route_type_val
             logo_surf = None
             if not is_bus:
                 logo_surf = self.load_route_logo(route, target_h=48)
+            center_start_x = left_x + STOP_TEXT_LEFT_OFFSET
             if logo_surf:
                 # Align logo vertically centered on the row
                 logo_rect = logo_surf.get_rect(midleft=(left_x - 24, y_pos))
                 self.screen.blit(logo_surf, logo_rect)
             else:
                 route_color = self.get_route_color(route)
-                left_surf = route_font.render(str(route), True, route_color)
-                left_rect = left_surf.get_rect(midleft=(left_x, y_pos))
-                self.screen.blit(left_surf, left_rect)
+                badge_text = str(route)
+                badge_surf = route_font.render(badge_text, True, (0, 0, 0))
+                badge_width = badge_surf.get_width() + 28
+                badge_height = badge_surf.get_height() + 18
+                badge_rect = pygame.Rect(0, 0, badge_width, badge_height)
+                badge_rect.center = (left_x, y_pos)
+                pygame.draw.ellipse(self.screen, route_color, badge_rect)
+                self.screen.blit(badge_surf, badge_surf.get_rect(center=badge_rect.center))
+                center_start_x = badge_rect.right + 12
 
             center_text_value = get_arrival_center_label(item)
 
             # All non-badge text should be white on the LED background; anchor stop text near the left column
             center_surf = route_font.render(str(center_text_value), True, HEADER_COLOR)
-            center_start_x = left_x + STOP_TEXT_LEFT_OFFSET
             center_rect = center_surf.get_rect(midleft=(center_start_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
@@ -612,6 +618,13 @@ def _determine_display_backend():
 bus_display = None
 
 
+def normalize_stop_name(stop_name):
+    """Return a lower-case stop name if one was provided."""
+    if not stop_name:
+        return stop_name
+    return str(stop_name).strip().lower()
+
+
 def input_thread(a_list):
     raw_input()  # use input() in Python3
     a_list.append(True)
@@ -847,7 +860,7 @@ def get_bus_arrivals():
     all_arrivals = []
     for s in stops_config:
         stop_id = s.get('id')
-        stop_name = s.get('name', f"Stop {stop_id}")
+        stop_name = normalize_stop_name(s.get('name', f"Stop {stop_id}"))
         if not stop_id:
             continue
 
@@ -898,7 +911,7 @@ def get_subway_arrivals():
     all_arrivals = []
     for s in stops_config:
         stop_id = s.get('id')
-        stop_name = s.get('name', f"Stop {stop_id}")
+        stop_name = normalize_stop_name(s.get('name', f"Stop {stop_id}"))
         if not stop_id:
             continue
 
