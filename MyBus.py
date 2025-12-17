@@ -357,7 +357,7 @@ class BusArrivalDisplay:
                 self.screen.blit(logo_surf, logo_rect)
             else:
                 route_color = self.get_route_color(route)
-                badge_text = str(route)
+                badge_text = str(route).upper()
                 badge_surf = badge_font.render(badge_text, True, (0, 0, 0))
                 badge_width = badge_surf.get_width() + 28
                 badge_height = badge_surf.get_height() + 18
