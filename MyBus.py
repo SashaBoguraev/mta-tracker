@@ -305,7 +305,6 @@ class BusArrivalDisplay:
         visible = arrivals[:max_visible]
 
         left_x = 80
-        center_x = SCREEN_WIDTH // 2 - 200
         right_x = SCREEN_WIDTH - 80
 
         for i, item in enumerate(visible):
@@ -346,9 +345,10 @@ class BusArrivalDisplay:
 
             center_text_value = get_arrival_center_label(item)
 
-            # All non-badge text should be white on the LED background
+            # All non-badge text should be white on the LED background; anchor stop text near the left column
             center_surf = route_font.render(str(center_text_value), True, HEADER_COLOR)
-            center_rect = center_surf.get_rect(center=(center_x, y_pos))
+            center_start_x = left_x + 120
+            center_rect = center_surf.get_rect(midleft=(center_start_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
             # Minutes text in white (user requested white text except for the line badge)
@@ -547,7 +547,10 @@ if _HAS_RGBMATRIX:
 
             center_text = row['center_text']
             center_width = self._text_width(center_text)
-            center_x = max(route_x + route_width + 6, (self.cols - center_width) // 2)
+            center_margin = 8
+            center_left = route_x + route_width + center_margin
+            max_allowed = max(1, self.cols - center_width - 1)
+            center_x = min(center_left, max_allowed)
             graphics.DrawText(self.canvas, self.font, center_x, y, self.header_color, center_text)
 
             minutes_text = row['minutes_text']
