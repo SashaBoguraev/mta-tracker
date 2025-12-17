@@ -89,6 +89,27 @@ Update the configuration with your specific details:
 python MyBus.py
 ```
 
+### Raspberry Pi One-time Setup
+
+If you `git clone` this repo onto a Pi, run:
+
+```bash
+./scripts/setup_pi.sh
+```
+
+That script installs system packages, builds the `hzeller/rpi-rgb-led-matrix` bindings,
+copies the `7x13.bdf` font into `fonts/`, and bootstraps `mybus-env` with all Python
+requirements.
+
+Once the helper finishes, activate the environment and start the monitor with the LED matrix backend:
+
+```bash
+source mybus-env/bin/activate
+MYBUS_DISPLAY_BACKEND=matrix python MyBus.py
+```
+
+If you prefer the pygame window instead of the matrix, omit the `MYBUS_DISPLAY_BACKEND` environment variable or use `MYBUS_DISPLAY_BACKEND=pygame`.
+
 
 The application will:
 1. Start monitoring and display "🚀 Starting transit arrival monitoring..."
@@ -107,6 +128,85 @@ Route Red : 2:38 PM (8 minutes)
 Route 47 : 2:42 PM (12 minutes)
 ```
 
+
+## 32x64 RGB LED Matrix Support
+
+If you're driving a 32x64 RGB LED matrix directly off a Raspberry Pi, the
+`MyBus` monitor can render a simplified readout using the
+[hzeller/rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix)
+bindings instead of pygame.
+
+### 1. Install the matrix library on the Pi
+
+1. Clone and build the project (run these as `pi` or another user with
+  hardware access):
+
+  ```bash
+  git clone https://github.com/hzeller/rpi-rgb-led-matrix ~/rpi-rgb-led-matrix
+  cd ~/rpi-rgb-led-matrix
+  make build-python PYTHON=$(which python3)
+  sudo make install-python PYTHON=$(which python3)
+  ```
+
+2. Copy the bundled font files into this repository (or update
+  `MATRIX_FONT_PATH` to point to them):
+
+  ```bash
+  cp ~/rpi-rgb-led-matrix/fonts/7x13.bdf fonts/
+  ```
+
+3. (Optional) Install any extra dependencies mentioned in the matrix README
+  such as `libfreetype6-dev` or `libopenjp2-7` before building.
+
+### 2. Configure `MyBus` for the matrix
+
+You can drive the matrix by either setting the environment variable
+`MYBUS_DISPLAY_BACKEND=matrix` or adding the optional display section to
+`ProviderConfig.json`:
+
+```json
+"display": {
+  "backend": "matrix",
+  "matrix": {
+   "rows": 32,
+   "cols": 64,
+   "chain_length": 1,
+   "parallel": 1,
+   "hardware_mapping": "adafruit-hat",
+   "gpio_slowdown": 2,
+   "brightness": 60,
+   "font_path": "/home/pi/rpi-rgb-led-matrix/fonts/7x13.bdf",
+   "text_color": [255, 255, 0],
+   "header_color": [0, 255, 0],
+   "max_arrivals": 2
+  }
+}
+```
+
+You only need the `matrix` dictionary when using the LED display. All
+values are optional; the defaults assume a single adafruit hat, 60% brightness,
+and the bundled 7x13 font.
+
+If you copy the font to a different location, export the override before
+starting the script:
+
+```bash
+export MATRIX_FONT_PATH=/path/to/7x13.bdf
+```
+
+### 3. Run the monitor on the matrix
+
+Make sure the Pi is configured to drive the display (GPIO pins wired,
+`rpi-rgb-led-matrix` installed, etc.), then start `MyBus`:
+
+```bash
+MYBUS_DISPLAY_BACKEND=matrix python MyBus.py
+```
+
+The matrix backend renders the stop name on the top row and two arrival
+lines beneath it, along with the current view mode. If the matrix cannot be
+initialized (missing font, library, or permissions), the application falls back
+to the pygame display automatically.
 
 
 ### Deactivating the Environment

@@ -10,6 +10,20 @@ import time
 import io
 
 try:
+    from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
+    _HAS_RGBMATRIX = True
+except ImportError:
+    RGBMatrix = None
+    RGBMatrixOptions = None
+    graphics = None
+    _HAS_RGBMATRIX = False
+
+# Display configuration
+DISPLAY_BACKEND_ENV_VAR = "MYBUS_DISPLAY_BACKEND"
+FONT_PATH_ENV_VAR = "MATRIX_FONT_PATH"
+DEFAULT_DISPLAY_BACKEND = 'matrix' if _HAS_RGBMATRIX else 'pygame'
+
+try:
     import cairosvg
     _HAS_CAIROSVG = True
 except Exception:
@@ -359,7 +373,118 @@ class BusArrivalDisplay:
         pygame.quit()
 
 
+if _HAS_RGBMATRIX:
+    class MatrixBusArrivalDisplay:
+        """Simple display for 32x64 RGB matrices"""
+
+        def __init__(self, matrix_config=None):
+            matrix_config = matrix_config or {}
+            options = RGBMatrixOptions()
+            options.rows = matrix_config.get('rows', 32)
+            options.cols = matrix_config.get('cols', 64)
+            options.chain_length = matrix_config.get('chain_length', 1)
+            options.parallel = matrix_config.get('parallel', 1)
+            options.hardware_mapping = matrix_config.get('hardware_mapping', 'adafruit-hat')
+            options.gpio_slowdown = matrix_config.get('gpio_slowdown', 2)
+            options.pwm_bits = matrix_config.get('pwm_bits', 11)
+            options.brightness = matrix_config.get('brightness', 60)
+            self.matrix = RGBMatrix(options=options)
+            self.canvas = self.matrix.CreateFrameCanvas()
+            self.rows = options.rows
+            self.cols = options.cols
+            self.font = graphics.Font()
+
+            font_path = matrix_config.get('font_path') or os.environ.get(FONT_PATH_ENV_VAR)
+            if not font_path:
+                font_path = os.path.join(os.path.dirname(__file__), 'fonts', '7x13.bdf')
+            if not os.path.exists(font_path):
+                raise FileNotFoundError(
+                    f"Matrix font not found at {font_path}. "
+                    f"Set {FONT_PATH_ENV_VAR} or copy the font from hzeller/rpi-rgb-led-matrix/fonts."
+                )
+            self.font.LoadFont(font_path)
+
+            self.line_height = self.font.height + 2
+            self.max_lines = matrix_config.get('max_lines', max(1, self.rows // self.line_height))
+            self.max_lines = max(1, self.max_lines)
+            self.max_chars = matrix_config.get('max_chars', max(4, self.cols // 6))
+            self.max_arrivals = matrix_config.get('max_arrivals', max(1, self.max_lines - 1))
+
+            self.text_color = graphics.Color(*matrix_config.get('text_color', (255, 255, 0)))
+            self.header_color = graphics.Color(*matrix_config.get('header_color', (0, 255, 0)))
+            self.view_mode = 'combined'
+
+        def set_view(self, mode):
+            self.view_mode = mode
+
+        def _truncate_text(self, text):
+            if not text:
+                return ''
+            return text[:self.max_chars]
+
+        def _build_lines(self, arrivals):
+            lines = []
+            stop_name = ''
+            if arrivals:
+                stop_name = arrivals[0].get('stop_name') or arrivals[0].get('route_long_name')
+            header = stop_name or 'Transit Arrivals'
+            lines.append(self._truncate_text(header))
+
+            if not arrivals:
+                lines.append(self._truncate_text('No data'))
+            else:
+                for arrival in arrivals[: self.max_arrivals]:
+                    route = arrival.get('route_short_name') or arrival.get('route_long_name') or 'Route'
+                    minutes = arrival.get('minutes_to_arrival')
+                    minutes_text = f"{minutes}m" if minutes is not None else '--'
+                    line = f"{route} {minutes_text}"
+                    lines.append(self._truncate_text(line))
+
+            if len(lines) < self.max_lines:
+                view_line = f"View {self.view_mode[:self.max_chars]}"
+                lines.append(self._truncate_text(view_line))
+
+            return lines[: self.max_lines]
+
+        def display_arrivals(self, arrivals):
+            self.canvas.Clear()
+            lines = self._build_lines(arrivals)
+            for idx, line in enumerate(lines):
+                y = (idx + 1) * self.line_height
+                color = self.header_color if idx == 0 else self.text_color
+                graphics.DrawText(self.canvas, self.font, 1, y, color, line)
+            self.canvas = self.matrix.SwapOnVSync(self.canvas)
+            return True
+
+        def cleanup(self):
+            self.matrix.Clear()
+
+else:
+    MatrixBusArrivalDisplay = None
+
+
 # Global display instance
+if MatrixBusArrivalDisplay:
+    DISPLAY_BACKENDS = {
+        'pygame': BusArrivalDisplay,
+        'matrix': MatrixBusArrivalDisplay,
+    }
+else:
+    DISPLAY_BACKENDS = {'pygame': BusArrivalDisplay}
+
+
+def _determine_display_backend():
+    config = load_config() or {}
+    display_config = config.get('display', {}) or {}
+    backend = os.environ.get(DISPLAY_BACKEND_ENV_VAR) or display_config.get('backend')
+    if not backend:
+        backend = DEFAULT_DISPLAY_BACKEND
+    if backend not in DISPLAY_BACKENDS:
+        logging.warning(f"Display backend '{backend}' is not supported. Falling back to pygame.")
+        backend = 'pygame'
+    return backend, display_config
+
+
 bus_display = None
 
 
@@ -721,7 +846,16 @@ def display_arrivals(arrivals):
     global bus_display
 
     if bus_display is None:
-        bus_display = BusArrivalDisplay()
+        backend, display_config = _determine_display_backend()
+        if backend == 'matrix':
+            matrix_conf = display_config.get('matrix', {})
+            try:
+                bus_display = MatrixBusArrivalDisplay(matrix_conf)
+            except Exception as exc:
+                logging.warning(f"Matrix display failed to initialize ({exc}); falling back to pygame.")
+                bus_display = BusArrivalDisplay()
+        else:
+            bus_display = BusArrivalDisplay()
 
     # Use the pygame display instead of console prints
     return bus_display.display_arrivals(arrivals)
