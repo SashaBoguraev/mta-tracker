@@ -47,17 +47,6 @@ else
   git clone https://github.com/hzeller/rpi-rgb-led-matrix "$MATRIX_REPO_DIR"
 fi
 
-cd "$MATRIX_REPO_DIR"
-
-echo "[mybus] Building rgbmatrix Python bindings..."
-git pull --ff-only || true
-make build-python PYTHON="$PYTHON_BIN"
-sudo make install-python PYTHON="$PYTHON_BIN"
-
-cd "$PROJECT_ROOT"
-mkdir -p "$FONT_DEST"
-cp -u "$MATRIX_REPO_DIR/fonts/7x13.bdf" "$FONT_DEST/"
-
 VENV_DIR="$PROJECT_ROOT/mybus-env"
 if [[ -d "$VENV_DIR" ]]; then
   echo "[mybus] Reusing existing virtual environment at $VENV_DIR"
@@ -70,7 +59,19 @@ fi
 source "$VENV_DIR/bin/activate"
 pip install --upgrade pip
 pip install -r requirements.txt
-pip install rgbmatrix~=2.1 || true
+
+VENV_PYTHON="$VENV_DIR/bin/python"
+
+cd "$MATRIX_REPO_DIR"
+
+echo "[mybus] Building rgbmatrix Python bindings..."
+git pull --ff-only || true
+make build-python PYTHON="$VENV_PYTHON"
+make install-python PYTHON="$VENV_PYTHON"
+
+cd "$PROJECT_ROOT"
+mkdir -p "$FONT_DEST"
+cp -u "$MATRIX_REPO_DIR/fonts/7x13.bdf" "$FONT_DEST/"
 
 cat <<'EOF'
 
