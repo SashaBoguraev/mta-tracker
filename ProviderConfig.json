@@ -52,7 +52,7 @@
       "max_lines": 4,
       "line_height": 7,
       "row_spacing": 1,
-      "top_padding": 2,
+      "top_padding": 1,
       "font_path": "fonts/5x7.bdf",
       "text_color": [255, 255, 0],
       "header_color": [0, 255, 0],
