@@ -218,9 +218,9 @@ and Columns ≤ 64, but you can override the defaults in `ProviderConfig.json`:
   "backend": "matrix",
   "matrix": {
     "compact_mode": true,
-    "line_height": 10,
-    "compact_max_lines": 3,
-    "max_arrivals": 2,
+    "line_height": 7,
+    "compact_max_lines": 4,
+    "max_arrivals": 4,
     "font_path": "fonts/7x13.bdf",
     "text_color": [255, 255, 0],
     "header_color": [0, 255, 0]
