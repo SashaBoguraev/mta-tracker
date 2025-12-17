@@ -415,7 +415,12 @@ if _HAS_RGBMATRIX:
                 if self.compact_mode:
                     self.line_height = max(6, min(self.line_height, self.font.height))
 
-            computed_lines = max(1, self.rows // self.line_height)
+            self.row_spacing = max(0, matrix_config.get('row_spacing', 0))
+            self.top_padding = max(0, matrix_config.get('top_padding', 0))
+            self.row_stride = max(1, self.line_height + self.row_spacing)
+
+            available_rows = max(0, self.rows - self.top_padding)
+            computed_lines = max(1, available_rows // self.row_stride)
             self.max_lines = min(preferred_lines, computed_lines)
             if self.max_lines < 1:
                 self.max_lines = 1
@@ -533,7 +538,7 @@ if _HAS_RGBMATRIX:
             self.canvas.Clear()
             rows = self._build_rows(arrivals)
             for idx, row in enumerate(rows):
-                y = (idx + 1) * self.line_height
+                y = self.top_padding + (idx + 1) * self.row_stride
                 if row['type'] == 'message':
                     msg_text = row['text']
                     msg_width = self._text_width(msg_text)
