@@ -404,25 +404,24 @@ if _HAS_RGBMATRIX:
                 )
             self.font.LoadFont(font_path)
 
-            self.compact_mode = matrix_config.get('compact_mode', self.rows <= 32 and self.cols <= 64)
+            self.compact_mode = matrix_config.get('compact_mode', True)
+            preferred_lines = matrix_config.get('max_lines', 4)
+            preferred_lines = max(1, preferred_lines)
+
             if 'line_height' in matrix_config:
                 self.line_height = max(1, matrix_config['line_height'])
             else:
-                default_line_height = self.font.height + 2
+                self.line_height = max(6, (self.rows - 1) // preferred_lines)
                 if self.compact_mode:
-                    default_line_height = max(10, self.font.height - 2)
-                self.line_height = default_line_height
+                    self.line_height = max(6, min(self.line_height, self.font.height))
 
             computed_lines = max(1, self.rows // self.line_height)
-            requested_lines = matrix_config.get('max_lines', computed_lines)
-            self.max_lines = min(max(1, requested_lines), computed_lines)
-            if self.compact_mode:
-                compact_limit = matrix_config.get('compact_max_lines', 4)
-                self.max_lines = min(self.max_lines, compact_limit)
-            self.max_lines = max(1, self.max_lines)
+            self.max_lines = min(preferred_lines, computed_lines)
+            if self.max_lines < 1:
+                self.max_lines = 1
 
             self.max_chars = matrix_config.get('max_chars', max(4, self.cols // 6))
-            arrivals_capacity = max(1, self.max_lines - 1)
+            arrivals_capacity = max(1, self.max_lines)
             requested_arrivals = matrix_config.get('max_arrivals')
             if requested_arrivals is None:
                 requested_arrivals = arrivals_capacity
@@ -471,10 +470,10 @@ if _HAS_RGBMATRIX:
             return self.text_color
 
         def _format_center_text(self, arrival):
-            stop_name = arrival.get('stop_name') or arrival.get('route_long_name') or 'Transit'
-            destination = arrival.get('route_long_name')
+            stop_name = arrival.get('stop_name') or 'Transit'
+            destination = arrival.get('destination') or arrival.get('route_long_name')
             if destination and destination != stop_name:
-                stop_display = f"{stop_name} -> {destination}"
+                stop_display = f"{stop_name} ({destination})"
             else:
                 stop_display = stop_name
             return self._truncate_text(stop_display)
@@ -490,32 +489,23 @@ if _HAS_RGBMATRIX:
 
         def _build_rows(self, arrivals):
             rows = []
-            stop_name = ''
-            if arrivals:
-                stop_name = arrivals[0].get('stop_name') or arrivals[0].get('route_long_name')
-            header = stop_name or 'Transit Arrivals'
-            rows.append({'type': 'header', 'text': self._truncate_text(header)})
-
             if not arrivals:
-                rows.append({'type': 'message', 'text': self._truncate_text('No data')})
-            else:
-                for arrival in arrivals[: self.max_arrivals]:
-                    route_name = arrival.get('route_short_name') or arrival.get('route_long_name') or 'Route'
-                    route_label = self._truncate_text(route_name, max_chars=4)
-                    center_text = self._format_center_text(arrival)
-                    minutes_text, minutes_color = self._format_minutes_text(arrival.get('minutes_to_arrival'))
-                    rows.append({
-                        'type': 'arrival',
-                        'route_label': route_label,
-                        'route_color': self._get_route_color(route_name),
-                        'center_text': center_text,
-                        'minutes_text': minutes_text,
-                        'minutes_color': minutes_color,
-                    })
+                rows.append({'type': 'message', 'text': self._truncate_text('No arrivals')})
+                return rows
 
-            if len(rows) < self.max_lines:
-                view_line = f"View {self.view_mode.capitalize()}"
-                rows.append({'type': 'view', 'text': self._truncate_text(view_line)})
+            for arrival in arrivals[: self.max_arrivals]:
+                route_name = arrival.get('route_short_name') or arrival.get('route_long_name') or 'Route'
+                route_label = self._truncate_text(route_name, max_chars=4)
+                center_text = self._format_center_text(arrival)
+                minutes_text, minutes_color = self._format_minutes_text(arrival.get('minutes_to_arrival'))
+                rows.append({
+                    'type': 'arrival',
+                    'route_label': route_label,
+                    'route_color': self._get_route_color(route_name),
+                    'center_text': center_text,
+                    'minutes_text': minutes_text,
+                    'minutes_color': minutes_color,
+                })
 
             return rows[: self.max_lines]
 
@@ -539,22 +529,26 @@ if _HAS_RGBMATRIX:
             minutes_x = min(minutes_x, max(1, self.cols - minutes_width - 1))
             graphics.DrawText(self.canvas, self.font, minutes_x, y, row['minutes_color'], minutes_text)
 
+        def _draw_view_indicator(self):
+            view_text = self._truncate_text(f"View {self.view_mode.capitalize()}")
+            view_width = self._text_width(view_text)
+            view_x = max(1, (self.cols - view_width) // 2)
+            view_y = max(self.line_height, self.rows - 1)
+            graphics.DrawText(self.canvas, self.font, view_x, view_y, self.header_color, view_text)
+
         def display_arrivals(self, arrivals):
             self.canvas.Clear()
             rows = self._build_rows(arrivals)
             for idx, row in enumerate(rows):
                 y = (idx + 1) * self.line_height
-                if row['type'] == 'header':
-                    graphics.DrawText(self.canvas, self.font, 1, y, self.header_color, row['text'])
-                elif row['type'] == 'message':
-                    graphics.DrawText(self.canvas, self.font, 1, y, self.warning_color, row['text'])
-                elif row['type'] == 'view':
-                    view_text = row['text']
-                    view_width = self._text_width(view_text)
-                    view_x = max(1, (self.cols - view_width) // 2)
-                    graphics.DrawText(self.canvas, self.font, view_x, y, self.header_color, view_text)
+                if row['type'] == 'message':
+                    msg_text = row['text']
+                    msg_width = self._text_width(msg_text)
+                    msg_x = max(1, (self.cols - msg_width) // 2)
+                    graphics.DrawText(self.canvas, self.font, msg_x, y, self.warning_color, msg_text)
                 else:
                     self._draw_arrival_row(row, y)
+            self._draw_view_indicator()
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
             return True
 
