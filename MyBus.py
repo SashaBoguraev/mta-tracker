@@ -42,6 +42,7 @@ SCREEN_HEIGHT = SCREEN_WIDTH // 2
 BACKGROUND_COLOR = (0, 0, 0)  # Black
 TEXT_COLOR = (255, 255, 0)  # Yellow
 HEADER_COLOR = (255, 255, 255)  # White
+STOP_TEXT_COLOR = (0, 142, 255)  # Blue for stop names
 ARRIVAL_COLOR = (0, 255, 0)  # Green
 WARNING_COLOR = (255, 165, 0)  # Orange
 URGENT_COLOR = (255, 0, 0)  # Red
@@ -376,6 +377,7 @@ class BusArrivalDisplay:
             route_type_val = str(item.get('route_type') or '').lower()
             is_bus = 'bus' in route_type_val
             logo_surf = None
+            route_color = self.get_route_color(route)
             if not is_bus:
                 logo_surf = self.load_route_logo(route, target_h=48)
             center_start_x = left_x + STOP_TEXT_LEFT_OFFSET
@@ -384,7 +386,6 @@ class BusArrivalDisplay:
                 logo_rect = logo_surf.get_rect(midleft=(left_x - 24, y_pos))
                 self.screen.blit(logo_surf, logo_rect)
             else:
-                route_color = self.get_route_color(route)
                 badge_text = str(route).upper()
                 badge_surf = badge_font.render(badge_text, True, (0, 0, 0))
                 badge_width = badge_surf.get_width() + 28
@@ -398,7 +399,8 @@ class BusArrivalDisplay:
             center_text_value = _normalize_stop_label(get_arrival_center_label(item))
 
             # All non-badge text should be white on the LED background; anchor stop text near the left column
-            center_surf = render_text_with_custom_space(route_font, center_text_value, HEADER_COLOR)
+            center_color = route_color or STOP_TEXT_COLOR
+            center_surf = render_text_with_custom_space(route_font, center_text_value, center_color)
             center_rect = center_surf.get_rect(midleft=(center_start_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
@@ -665,7 +667,7 @@ def normalize_stop_name(stop_name):
     """Return a lower-case stop name if one was provided."""
     if not stop_name:
         return stop_name
-    return str(stop_name).strip().upper()
+    return str(stop_name).strip()[:1].upper() + str(stop_name).strip()[1:].lower()
 
 
 def input_thread(a_list):
