@@ -370,7 +370,7 @@ class BusArrivalDisplay:
             center_text_value = _normalize_stop_label(get_arrival_center_label(item))
 
             # All non-badge text should be white on the LED background; anchor stop text near the left column
-            center_surf = route_font.render(str(center_text_value), True, HEADER_COLOR)
+            center_surf = route_font.render(str(center_text_value).upper(), True, HEADER_COLOR)
             center_rect = center_surf.get_rect(midleft=(center_start_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
