@@ -9,6 +9,7 @@ import pygame
 import time
 import io
 import re
+import math
 
 try:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
@@ -53,6 +54,7 @@ time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
 STOP_TEXT_LEFT_OFFSET = 0
 MATRIX_CENTER_MARGIN = 2
+CUSTOM_SPACE_SCALE = 0.55
 
 
 def _extract_after_nassau_av(stop_name):
@@ -80,6 +82,32 @@ def _normalize_stop_label(label):
                      cleaned,
                      flags=re.IGNORECASE)
     return cleaned.strip().upper()
+
+
+def render_text_with_custom_space(font, text, color, space_scale=CUSTOM_SPACE_SCALE):
+    """Render text while shrinking inter-word spacing to the given scale."""
+    if text is None:
+        text = ''
+    text = str(text)
+    base_space = max(1, font.size(' ')[0])
+    scaled_space = max(1, int(math.ceil(base_space * space_scale)))
+    glyphs = []
+    x_cursor = 0
+    for char in text:
+        if char == ' ':
+            x_cursor += scaled_space
+            continue
+        glyph = font.render(char, True, color)
+        glyphs.append((glyph, x_cursor))
+        x_cursor += glyph.get_width()
+
+    width = max(1, math.ceil(x_cursor))
+    height = font.get_height()
+    surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    surface.fill((0, 0, 0, 0))
+    for glyph, xpos in glyphs:
+        surface.blit(glyph, (xpos, 0))
+    return surface
 
 
 def _is_subway_or_rail_route(route_type):
@@ -370,7 +398,7 @@ class BusArrivalDisplay:
             center_text_value = _normalize_stop_label(get_arrival_center_label(item))
 
             # All non-badge text should be white on the LED background; anchor stop text near the left column
-            center_surf = route_font.render(str(center_text_value).upper(), True, HEADER_COLOR)
+            center_surf = render_text_with_custom_space(route_font, center_text_value, HEADER_COLOR)
             center_rect = center_surf.get_rect(midleft=(center_start_x, y_pos))
             self.screen.blit(center_surf, center_rect)
 
@@ -637,7 +665,7 @@ def normalize_stop_name(stop_name):
     """Return a lower-case stop name if one was provided."""
     if not stop_name:
         return stop_name
-    return str(stop_name).strip().lower()
+    return str(stop_name).strip().upper()
 
 
 def input_thread(a_list):
