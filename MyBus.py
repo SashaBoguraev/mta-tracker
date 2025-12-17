@@ -559,7 +559,16 @@ if _HAS_RGBMATRIX:
 
         def _format_center_text(self, arrival):
             center_label = get_arrival_center_label(arrival)
-            return self._truncate_text(center_label)
+            label = self._capitalize_first_letter(center_label)
+            return self._truncate_text(label)
+
+        def _capitalize_first_letter(self, text):
+            if not text:
+                return ''
+            trimmed = str(text).strip()
+            if not trimmed:
+                return ''
+            return trimmed[0].upper() + trimmed[1:]
 
         def _format_minutes_text(self, minutes):
             if minutes is None:
@@ -604,7 +613,8 @@ if _HAS_RGBMATRIX:
             center_left = route_x + route_width + center_margin
             max_allowed = max(1, self.cols - center_width - 1)
             center_x = min(center_left, max_allowed)
-            graphics.DrawText(self.canvas, self.font, center_x, y, self.header_color, center_text)
+            center_color = row.get('route_color') or self.header_color
+            graphics.DrawText(self.canvas, self.font, center_x, y, center_color, center_text)
 
             minutes_text = row['minutes_text']
             minutes_width = self._text_width(minutes_text)
