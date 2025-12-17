@@ -8,6 +8,7 @@ import os
 import pygame
 import time
 import io
+import re
 
 try:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions, graphics
@@ -47,6 +48,7 @@ URGENT_COLOR = (255, 0, 0)  # Red
 # Fonts
 header_font = pygame.font.Font(None, 46)
 route_font = pygame.font.Font(None, 38)
+badge_font = pygame.font.Font(None, 32)
 time_font = pygame.font.Font(None, 32)
 small_font = pygame.font.Font(None, 28)
 STOP_TEXT_LEFT_OFFSET = 0
@@ -64,6 +66,20 @@ def _extract_after_nassau_av(stop_name):
         return None
     tail = stop_name[idx + len(marker):].strip()
     return tail or None
+
+
+def _normalize_stop_label(label):
+    """Clean up spacing and casing for stop labels containing abbreviations."""
+    if not label:
+        return label
+
+    cleaned = re.sub(r'\s+/\s+', ' / ', label)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\b(av|st|ave|street|blvd|pl|place)\b',
+                     lambda m: m.group(0).title(),
+                     cleaned,
+                     flags=re.IGNORECASE)
+    return cleaned.strip()
 
 
 def _is_subway_or_rail_route(route_type):
@@ -130,7 +146,6 @@ class BusArrivalDisplay:
         candidates = []
         candidates.append(raw)
         # alphanumeric only (strip punctuation/whitespace)
-        import re
         alnum = re.sub(r'[^A-Za-z0-9]', '', raw)
         if alnum and alnum not in candidates:
             candidates.append(alnum)
@@ -343,7 +358,7 @@ class BusArrivalDisplay:
             else:
                 route_color = self.get_route_color(route)
                 badge_text = str(route)
-                badge_surf = route_font.render(badge_text, True, (0, 0, 0))
+                badge_surf = badge_font.render(badge_text, True, (0, 0, 0))
                 badge_width = badge_surf.get_width() + 28
                 badge_height = badge_surf.get_height() + 18
                 badge_rect = pygame.Rect(0, 0, badge_width, badge_height)
@@ -352,7 +367,7 @@ class BusArrivalDisplay:
                 self.screen.blit(badge_surf, badge_surf.get_rect(center=badge_rect.center))
                 center_start_x = badge_rect.right + 12
 
-            center_text_value = get_arrival_center_label(item)
+            center_text_value = _normalize_stop_label(get_arrival_center_label(item))
 
             # All non-badge text should be white on the LED background; anchor stop text near the left column
             center_surf = route_font.render(str(center_text_value), True, HEADER_COLOR)
