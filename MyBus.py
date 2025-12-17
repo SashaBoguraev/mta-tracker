@@ -85,13 +85,16 @@ def _normalize_stop_label(label):
     return cleaned.strip().upper()
 
 
-def render_text_with_custom_space(font, text, color, space_scale=CUSTOM_SPACE_SCALE):
-    """Render text while shrinking inter-word spacing to the given scale."""
+def render_text_with_custom_space(font, text, color, space_scale=CUSTOM_SPACE_SCALE, space_width=None):
+    """Render text while adjusting inter-word spacing to either a scale or fixed width."""
     if text is None:
         text = ''
     text = str(text)
-    base_space = max(1, font.size(' ')[0])
-    scaled_space = max(1, int(math.ceil(base_space * space_scale)))
+    if space_width is None:
+        base_space = max(1, font.size(' ')[0])
+        scaled_space = max(1, int(math.ceil(base_space * space_scale)))
+    else:
+        scaled_space = max(1, int(math.ceil(space_width)))
     glyphs = []
     x_cursor = 0
     for char in text:
@@ -288,7 +291,7 @@ class BusArrivalDisplay:
         self.screen.blit(title_text, title_rect)
 
         # Stop name
-        stop_text = route_font.render(f"{stop_name}", True, TEXT_COLOR)
+        stop_text = render_text_with_custom_space(route_font, stop_name, TEXT_COLOR, space_width=3)
         stop_rect = stop_text.get_rect(center=(SCREEN_WIDTH // 2, 65))
         self.screen.blit(stop_text, stop_rect)
 
