@@ -1017,6 +1017,9 @@ def get_subway_arrivals():
                     'track': st.get('track')
                 })
 
+    # Filter out subways more than 9 minutes away
+    all_arrivals = [a for a in all_arrivals if a.get('minutes_to_arrival') is not None and a['minutes_to_arrival'] <= 10]
+
     # Sort by arrival_time (ISO) if available, otherwise leave order
     def _sort_key(x):
         try:
