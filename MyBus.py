@@ -504,6 +504,7 @@ if _HAS_RGBMATRIX:
                 'B': graphics.Color(30, 115, 190),
             }
             self.view_mode = 'combined'
+            self._scroll_offsets = {}
 
         def set_view(self, mode):
             self.view_mode = mode
@@ -601,22 +602,34 @@ if _HAS_RGBMATRIX:
 
             return rows[: self.max_lines]
 
-        def _draw_arrival_row(self, row, y):
-            # Draw stop text starting from left
+        def _draw_arrival_row(self, row, y, row_index):
+            # Draw stop text starting from left and scroll long labels per row
             center_text = row['center_text']
-            center_x = 1
             center_color = row.get('route_color') or self.header_color
-            self._draw_text_custom(center_x, y, center_color, center_text)
+            center_width = self._text_width(center_text)
+            center_x = 1
 
-            # Draw minutes text on the right
             minutes_text = row['minutes_text']
             minutes_width = self._text_width(minutes_text)
             minutes_x = self.cols - minutes_width - 1
-            center_width = self._text_width(center_text)
             min_overlap = center_x + center_width + 6
             if minutes_x < min_overlap:
                 minutes_x = min_overlap
             minutes_x = min(minutes_x, max(1, self.cols - minutes_width - 1))
+
+            available_width = max(0, minutes_x - center_x - 4)
+            scroll_key = (row_index, center_text)
+            if center_width > available_width:
+                offset = self._scroll_offsets.get(scroll_key, 0)
+                scroll_span = center_width + max(available_width, 6)
+                rendered_x = center_x - offset
+                self._draw_text_custom(rendered_x, y, center_color, center_text)
+                offset = (offset + 1) % scroll_span
+                self._scroll_offsets[scroll_key] = offset
+            else:
+                self._scroll_offsets.pop(scroll_key, None)
+                self._draw_text_custom(center_x, y, center_color, center_text)
+
             graphics.DrawText(self.canvas, self.font, minutes_x, y, row['minutes_color'], minutes_text)
 
         def display_arrivals(self, arrivals):
@@ -631,7 +644,7 @@ if _HAS_RGBMATRIX:
                     msg_x = max(1, (self.cols - msg_width) // 2)
                     graphics.DrawText(self.canvas, self.font, msg_x, y, self.warning_color, msg_text)
                 else:
-                    self._draw_arrival_row(row, y)
+                    self._draw_arrival_row(row, y, idx)
             self.canvas = self.matrix.SwapOnVSync(self.canvas)
             return True
 
