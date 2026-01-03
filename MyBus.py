@@ -513,7 +513,15 @@ if _HAS_RGBMATRIX:
                 self._scroll_delay_seconds = 5.0
 
         def set_view(self, mode):
+            if mode == self.view_mode:
+                return
             self.view_mode = mode
+            self._reset_scrolling_state()
+
+        def _reset_scrolling_state(self):
+            """Restart scrolling state so text begins at the left after mode switch."""
+            self._scroll_offsets.clear()
+            self._scroll_delay_until.clear()
 
         def _truncate_text(self, text, max_chars=None):
             if not text:
