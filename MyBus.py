@@ -563,7 +563,7 @@ if _HAS_RGBMATRIX:
         def _format_center_text(self, arrival):
             center_label = get_arrival_center_label(arrival)
             label = self._capitalize_first_letter(center_label)
-            return self._truncate_text(label)
+            return label
 
         def _capitalize_first_letter(self, text):
             if not text:
