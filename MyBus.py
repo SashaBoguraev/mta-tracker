@@ -619,12 +619,14 @@ if _HAS_RGBMATRIX:
 
             available_width = max(0, minutes_x - center_x - 4)
             scroll_key = (row_index, center_text)
-            if center_width > available_width:
+            overflow_pixels = center_width - available_width
+            should_scroll = overflow_pixels > 4
+            if should_scroll:
                 offset = self._scroll_offsets.get(scroll_key, 0)
                 scroll_span = center_width + max(available_width, 6)
                 rendered_x = center_x - offset
                 self._draw_text_custom(rendered_x, y, center_color, center_text)
-                offset = (offset + 1) % scroll_span
+                offset = (offset + 2) % scroll_span
                 self._scroll_offsets[scroll_key] = offset
             else:
                 self._scroll_offsets.pop(scroll_key, None)
