@@ -617,42 +617,50 @@ if _HAS_RGBMATRIX:
             return rows[: self.max_lines]
 
         def _draw_arrival_row(self, row, y, row_index):
-            # Draw stop text starting from left and scroll long labels per row
             center_text = row['center_text']
             center_color = row.get('route_color') or self.header_color
-            center_width = self._text_width(center_text)
             center_x = 1
 
             minutes_text = row['minutes_text']
             minutes_width = self._text_width(minutes_text)
+            visible_baseline = self._truncate_text(center_text)
+            visible_max_width = max(1, self._text_width(center_text[: self.max_chars]))
             minutes_x = self.cols - minutes_width - 1
-            min_overlap = center_x + center_width + 6
-            if minutes_x < min_overlap:
-                minutes_x = min_overlap
+            required_gap = center_x + visible_max_width + 6
+            if len(center_text) > self.max_chars:
+                required_gap = max(required_gap, center_x + self._text_width(center_text) + 6)
+            if minutes_x < required_gap:
+                minutes_x = required_gap
             minutes_x = min(minutes_x, max(1, self.cols - minutes_width - 1))
 
-            available_width = max(0, minutes_x - center_x - 4)
             scroll_key = (row_index, center_text)
-            overflow_pixels = center_width - available_width
-            should_scroll = overflow_pixels > 4
-            if should_scroll:
+            needs_scroll = len(center_text) > self.max_chars
+            display_text = visible_baseline
+
+            if needs_scroll:
                 now = time.time()
-                start_time = self._scroll_delay_until.setdefault(
+                delay_until = self._scroll_delay_until.setdefault(
                     scroll_key, now + self._scroll_delay_seconds
                 )
-                if now < start_time:
-                    rendered_x = center_x
-                else:
+                if now >= delay_until:
+                    padding = ' ' * max(3, self.max_chars // 2)
+                    scroll_buffer = center_text + padding
+                    buffer_len = len(scroll_buffer)
                     offset = self._scroll_offsets.get(scroll_key, 0)
-                    scroll_span = center_width + max(available_width, 6)
-                    rendered_x = center_x - offset
-                    offset = (offset + 2) % scroll_span
+                    end_idx = offset + self.max_chars
+                    if end_idx <= buffer_len:
+                        display_text = scroll_buffer[offset:end_idx]
+                    else:
+                        head = scroll_buffer[offset:]
+                        tail = scroll_buffer[: self.max_chars - len(head)]
+                        display_text = head + tail
+                    offset = (offset + 1) % buffer_len
                     self._scroll_offsets[scroll_key] = offset
-                self._draw_text_custom(rendered_x, y, center_color, center_text)
             else:
                 self._scroll_offsets.pop(scroll_key, None)
                 self._scroll_delay_until.pop(scroll_key, None)
-                self._draw_text_custom(center_x, y, center_color, center_text)
+
+            self._draw_text_custom(center_x, y, center_color, display_text)
 
             graphics.DrawText(self.canvas, self.font, minutes_x, y, row['minutes_color'], minutes_text)
 
