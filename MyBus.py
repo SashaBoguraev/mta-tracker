@@ -505,6 +505,12 @@ if _HAS_RGBMATRIX:
             }
             self.view_mode = 'combined'
             self._scroll_offsets = {}
+            self._scroll_delay_until = {}
+            delay_value = matrix_config.get('scroll_delay_seconds', 5)
+            try:
+                self._scroll_delay_seconds = max(0.0, float(delay_value))
+            except (TypeError, ValueError):
+                self._scroll_delay_seconds = 5.0
 
         def set_view(self, mode):
             self.view_mode = mode
@@ -622,14 +628,22 @@ if _HAS_RGBMATRIX:
             overflow_pixels = center_width - available_width
             should_scroll = overflow_pixels > 4
             if should_scroll:
-                offset = self._scroll_offsets.get(scroll_key, 0)
-                scroll_span = center_width + max(available_width, 6)
-                rendered_x = center_x - offset
+                now = time.time()
+                start_time = self._scroll_delay_until.setdefault(
+                    scroll_key, now + self._scroll_delay_seconds
+                )
+                if now < start_time:
+                    rendered_x = center_x
+                else:
+                    offset = self._scroll_offsets.get(scroll_key, 0)
+                    scroll_span = center_width + max(available_width, 6)
+                    rendered_x = center_x - offset
+                    offset = (offset + 2) % scroll_span
+                    self._scroll_offsets[scroll_key] = offset
                 self._draw_text_custom(rendered_x, y, center_color, center_text)
-                offset = (offset + 2) % scroll_span
-                self._scroll_offsets[scroll_key] = offset
             else:
                 self._scroll_offsets.pop(scroll_key, None)
+                self._scroll_delay_until.pop(scroll_key, None)
                 self._draw_text_custom(center_x, y, center_color, center_text)
 
             graphics.DrawText(self.canvas, self.font, minutes_x, y, row['minutes_color'], minutes_text)

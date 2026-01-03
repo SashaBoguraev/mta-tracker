@@ -71,7 +71,7 @@ make install-python PYTHON="$VENV_PYTHON"
 
 cd "$PROJECT_ROOT"
 mkdir -p "$FONT_DEST"
-cp -u "$MATRIX_REPO_DIR/fonts/7x13.bdf" "$FONT_DEST/"
+cp -u "$MATRIX_REPO_DIR/fonts/5x7.bdf" "$FONT_DEST/"
 
 cat <<'EOF'
 
